@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NYC Web Swinger</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            overflow: hidden;
+            background-color: #050b14;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #ffffff;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .card {
+            background: rgba(12, 18, 34, 0.75);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 12px 18px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #ff3344;
+            margin-bottom: 6px;
+            text-shadow: 0 0 12px rgba(255, 51, 68, 0.6);
+        }
+        .controls-info {
+            font-size: 12px;
+            color: #d0d7de;
+            line-height: 1.5;
+        }
+        .key {
+            background: rgba(255, 255, 255, 0.22);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+        }
+        #stats {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            color: white;
+            z-index: 10;
+            text-align: right;
+            min-width: 160px;
+            font-size: 13px;
+        }
+        .stat-val {
+            font-size: 16px;
+            font-weight: bold;
+            color: #38ef7d;
+        }
+        .pos-first {
+            color: #ffd700 !important;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+        }
+        .pos-second {
+            color: #ff3344 !important;
+        }
+        .time-badge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: #1e293b;
+            color: #94a3b8;
+        }
+        #soundBanner {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 12px;
+            background: rgba(0,0,0,0.65);
+            padding: 8px 18px;
+            border-radius: 20px;
+            pointer-events: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 11;
+        }
+        #countdownOverlay {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 30px rgba(255, 51, 68, 0.8), 0 0 10px #000;
+            pointer-events: none;
+            z-index: 15;
+            display: none;
+            text-transform: uppercase;
+        }
+        #startModal, #raceModal, #skinModal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+            min-width: 300px;
+            max-width: 90vw;
+        }
+        #skinModal {
+            width: 480px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #startModal h2, #raceModal h2, #skinModal h2 {
+            font-size: 22px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        #startModal p, #raceModal p, #skinModal p {
+            font-size: 13px;
+            margin-bottom: 14px;
+            color: #e2e8f0;
+        }
+        .difficulty-btn {
+            display: block;
+            width: 100%;
+            margin: 8px 0;
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: transform 0.15s, filter 0.2s;
+            color: white;
+        }
+        .btn-super-easy { background: #38ef7d; color: #05140b; }
+        .btn-easy { background: #38bdf8; color: #041018; }
+        .btn-medium { background: #f59e0b; }
+        .btn-hard { background: #ff3344; }
+        .difficulty-btn:hover {
+            transform: scale(1.02);
+            filter: brightness(1.15);
+        }
+        .map-option-btn, .skin-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin: 8px 0;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+            text-align: left;
+        }
+        .map-option-btn:hover, .skin-toggle-btn:hover {
+            border-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.15);
+        }
+        .skin-toggle-btn {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(56, 189, 248, 0.2));
+            border-color: #a855f7;
+            margin-bottom: 12px;
+        }
+        .map-icon {
+            font-size: 20px;
+            margin-right: 10px;
+        }
+        .map-info {
+            flex-grow: 1;
+        }
+        .map-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .map-desc {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: none;
+            margin-top: 2px;
+        }
+        .back-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #cbd5e1;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        #restartBtn {
+            background: #ff3344;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 51, 68, 0.4);
+        }
+        #skinGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            overflow-y: auto;
+            padding: 6px;
+            max-height: 45vh;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            background: rgba(0,0,0,0.3);
+        }
+        .skin-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 6px 2px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .skin-card.selected {
+            border-color: #38ef7d;
+            background: rgba(56, 239, 125, 0.15);
+        }
+        .skin-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .skin-card canvas {
+            display: block;
+            margin: 0 auto 4px auto;
+            width: 36px;
+            height: 36px;
+        }
+        .skin-name {
+            font-size: 9px;
+            font-weight: 700;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .skin-status {
+            font-size: 8px;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+        .skin-status.unlocked { color: #38ef7d; }
+        .skin-status.lock-text { color: #ff3344; }
+
+        #achievementToast {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            background: linear-gradient(135deg, rgba(20, 20, 50, 0.95), rgba(88, 28, 135, 0.95));
+            border: 2px solid #ffd700;
+            padding: 10px 20px;
+            border-radius: 16px;
+            color: #ffffff;
+            text-align: center;
+            z-index: 30;
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.6);
+            pointer-events: none;
+            opacity: 0;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+        }
+        #achievementToast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .achieve-title {
+            font-size: 15px;
+            font-weight: 900;
+            color: #ffd700;
+            text-transform: uppercase;
+        }
+        .achieve-desc {
+            font-size: 12px;
+            color: #e0e7ff;
+        }
+
+        /* Mobile Touch Overlay Controls */
+        #mobileControls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100vw;
+            height: 120px;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 12;
+        }
+        .touch-group {
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        .touch-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            touch-action: manipulation;
+        }
+        .touch-btn:active {
+            background: rgba(56, 189, 248, 0.5);
+            transform: scale(0.92);
+        }
+        .touch-btn-swing {
+            width: 75px;
+            height: 75px;
+            background: rgba(255, 51, 68, 0.35);
+            border-color: #ff3344;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        .touch-btn-swing:active {
+            background: rgba(255, 51, 68, 0.7);
+        }
+
+        @media (max-width: 600px) {
+            #ui { display: none; }
+            #stats { font-size: 11px; min-width: 130px; }
+            .stat-val { font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui" class="card">
+        <h1>NYC Web Swinger</h1>
+        <div class="controls-info">
+            <p><span class="key">W</span> Hold to Swing & Reel In</p>
+            <p><span class="key">▲</span> Air Jump / Lift</p>
+            <p><span class="key">▼</span> Fast Dive Down</p>
+            <p>⚠️ Dodge mid-air obstacles!</p>
+        </div>
+    </div>
+
+    <div id="stats" class="card">
+        <div>SUIT: <span id="skinDisplay" class="stat-val" style="color:#f43f5e;">Classic Red</span></div>
+        <div>MAP: <span id="mapDisplay" class="stat-val" style="color:#a855f7;">Midtown</span></div>
+        <div>MODE: <span id="modeDisplay" class="stat-val" style="color:#38bdf8;">Easy</span></div>
+        <div>PLACE: <span id="posDisplay" class="stat-val pos-first">1st</span></div>
+        <div>FINISH IN: <span id="distDisplay" class="stat-val">10000</span> FT</div>
+        <div>SPEED: <span id="speedDisplay" class="stat-val">0</span> MPH</div>
+        <div>TIME: <span id="timeDisplay" class="stat-val" style="color:#facc15;">0.0s</span></div>
+        <div>BEST: <span id="bestDisplay" class="stat-val" style="color:#a855f7;">--</span></div>
+        <div>CYCLE: <span id="timeCycleDisplay" class="time-badge">Daytime</span></div>
+    </div>
+
+    <div id="achievementToast">
+        <div class="achieve-title" id="achieveTitle">🏆 NEW RECORD UNLOCKED! 🏆</div>
+        <div class="achieve-desc" id="achieveDesc">Fastest time on Easy Mode!</div>
+    </div>
+
+    <div id="soundBanner">🔊 Tap or click anywhere to enable Audio</div>
+
+    <div id="countdownOverlay">10</div>
+
+    <!-- Touch Controls for Mobile -->
+    <div id="mobileControls">
+        <div class="touch-group">
+            <div class="touch-btn" id="btnDown">▼</div>
+            <div class="touch-btn" id="btnUp">▲</div>
+        </div>
+        <div class="touch-group">
+            <div class="touch-btn touch-btn-swing" id="btnSwing">SWING</div>
+        </div>
+    </div>
+
+    <!-- Start Modal -->
+    <div id="startModal" class="card">
+        <div id="startStep1">
+            <h2>Step 1: Choose Location</h2>
+            <p>Select your swinging area across the skyline:</p>
+
+            <button class="skin-toggle-btn" onclick="openSkinModal()">
+                <span class="map-icon">👤</span>
+                <div class="map-info">
+                    <div class="map-title">Choose Suit</div>
+                    <div class="map-desc" id="skinCountDesc">100 Suits Available (1 Unlocked)</div>
+                </div>
+                <span>➔</span>
+            </button>
+            
+            <button class="map-option-btn" onclick="selectMap('midtown')">
+                <span class="map-icon">🏙️</span>
+                <div class="map-info">
+                    <div class="map-title">Midtown Manhattan</div>
+                    <div class="map-desc">Dense skyscraper alleys with mid-air drones.</div>
+                </div>
+                <span>➔</span>
+            </button>
+
+            <button class="map-option-btn" onclick="selectMap('park')">
+                <span class="map-icon">🌳</span>
+                <div class="map-info">
+                    <div class="map-title">Central Park & Playground</div>
+                    <div class="map-desc">Trees, grass, playgrounds, and pigeons.</div>
+                </div>
+                <span>➔</span>
+            </button>
+
+            <button class="map-option-btn" onclick="selectMap('neon')">
+                <span class="map-icon">🌃</span>
+                <div class="map-info">
+                    <div class="map-title">Cyber-NYC 2099</div>
+                    <div class="map-desc">Futuristic synthwave skyline with neon hover discs.</div>
+                </div>
+                <span>➔</span>
+            </button>
+        </div>
+
+        <div id="startStep2" style="display: none;">
+            <button class="back-btn" onclick="goBackToStep1()">⬅️ Change Location</button>
+            <h2>Step 2: Difficulty</h2>
+            <p>Selected: <strong id="selectedMapLabel" style="color: #38bdf8;">Midtown Manhattan</strong></p>
+            
+            <button class="difficulty-btn btn-super-easy" onclick="selectDifficulty('super-easy')">Super Easy</button>
+            <button class="difficulty-btn btn-easy" onclick="selectDifficulty('easy')">Easy</button>
+            <button class="difficulty-btn btn-medium" onclick="selectDifficulty('medium')">Medium</button>
+            <button class="difficulty-btn btn-hard" onclick="selectDifficulty('hard')">Hard</button>
+        </div>
+    </div>
+
+    <!-- Wardrobe Modal -->
+    <div id="skinModal" class="card" style="display: none;">
+        <h2>Suit Wardrobe (100 Suits)</h2>
+        <p>Win races against your rival to unlock new suits!</p>
+        <div id="skinGrid"></div>
+        <button class="back-btn" onclick="closeSkinModal()" style="margin-top: 12px; margin-bottom: 0;">⬅️ Back to Select</button>
+    </div>
+
+    <!-- Victory / Defeat Modal -->
+    <div id="raceModal" class="card" style="display: none;">
+        <h2 id="winnerTitle">YOU WIN!</h2>
+        <p id="winnerDesc">You beat your rival to the finish line!</p>
+        <button id="restartBtn" onclick="openStartModal()">Play Again</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const speedDisplay = document.getElementById('speedDisplay');
+        const distDisplay = document.getElementById('distDisplay');
+        const posDisplay = document.getElementById('posDisplay');
+        const modeDisplay = document.getElementById('modeDisplay');
+        const mapDisplay = document.getElementById('mapDisplay');
+        const skinDisplay = document.getElementById('skinDisplay');
+        const startStep1 = document.getElementById('startStep1');
+        const startStep2 = document.getElementById('startStep2');
+        const selectedMapLabel = document.getElementById('selectedMapLabel');
+        const timeCycleDisplay = document.getElementById('timeCycleDisplay');
+        const soundBanner = document.getElementById('soundBanner');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const startModal = document.getElementById('startModal');
+        const raceModal = document.getElementById('raceModal');
+        const skinModal = document.getElementById('skinModal');
+        const skinGrid = document.getElementById('skinGrid');
+        const skinCountDesc = document.getElementById('skinCountDesc');
+        const winnerTitle = document.getElementById('winnerTitle');
+        const winnerDesc = document.getElementById('winnerDesc');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const bestDisplay = document.getElementById('bestDisplay');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- 100 SUITS SYSTEM ---
+        const SUITS_100 = [];
+        for (let i = 0; i < 100; i++) {
+            const primaryHue = (i * 37) % 360;
+            const secondaryHue = (i * 37 + 160) % 360;
+            SUITS_100.push({
+                id: i,
+                name: i === 0 ? "Classic Crimson" : `Runner Suit #${i + 1}`,
+                primary: i === 0 ? '#d61c1c' : `hsl(${primaryHue}, 75%, 45%)`,
+                secondary: i === 0 ? '#1b4fb8' : `hsl(${secondaryHue}, 70%, 40%)`,
+                logo: (i % 2 === 0) ? '#000000' : '#ffffff'
+            });
+        }
+
+        let unlockedSkins = [0];
+        let equippedSkinId = 0;
+
+        try {
+            const saved = JSON.parse(localStorage.getItem('nyc_unlocked_skins') || '[0]');
+            if (Array.isArray(saved) && saved.length > 0) unlockedSkins = saved;
+            equippedSkinId = parseInt(localStorage.getItem('nyc_equipped_skin') || '0', 10);
+            if (isNaN(equippedSkinId) || equippedSkinId < 0 || equippedSkinId >= 100) equippedSkinId = 0;
+        } catch(e) {}
+
+        function saveSkinProgress() {
+            try {
+                localStorage.setItem('nyc_unlocked_skins', JSON.stringify(unlockedSkins));
+                localStorage.setItem('nyc_equipped_skin', equippedSkinId.toString());
+            } catch(e) {}
+        }
+
+        function unlockNextSkin() {
+            if (unlockedSkins.length < 100) {
+                for (let i = 0; i < 100; i++) {
+                    if (!unlockedSkins.includes(i)) {
+                        unlockedSkins.push(i);
+                        saveSkinProgress();
+                        return SUITS_100[i];
+                    }
+                }
+            }
+            return null;
+        }
+
+        function renderSkinGrid() {
+            if (!skinGrid) return;
+            skinGrid.innerHTML = '';
+            if (skinCountDesc) skinCountDesc.textContent = `100 Suits Available (${unlockedSkins.length} Unlocked)`;
+
+            SUITS_100.forEach(suit => {
+                const isUnlocked = unlockedSkins.includes(suit.id);
+                const isSelected = suit.id === equippedSkinId;
+
+                const card = document.createElement('div');
+                card.className = `skin-card ${isSelected ? 'selected' : ''} ${!isUnlocked ? 'locked' : ''}`;
+                
+                const miniCanvas = document.createElement('canvas');
+                miniCanvas.width = 36;
+                miniCanvas.height = 36;
+                const mctx = miniCanvas.getContext('2d');
+
+                mctx.save();
+                mctx.translate(18, 18);
+                mctx.fillStyle = suit.primary;
+                mctx.beginPath();
+                mctx.arc(0, 0, 14, 0, Math.PI * 2);
+                mctx.fill();
+
+                if (isUnlocked) {
+                    mctx.fillStyle = '#ffffff';
+                    mctx.beginPath();
+                    mctx.ellipse(-5, -2, 4, 6, -Math.PI / 7, 0, Math.PI * 2);
+                    mctx.ellipse(5, -2, 4, 6, Math.PI / 7, 0, Math.PI * 2);
+                    mctx.fill();
+                } else {
+                    mctx.fillStyle = '#ffffff';
+                    mctx.font = '12px sans-serif';
+                    mctx.textAlign = 'center';
+                    mctx.fillText('🔒', 0, 4);
+                }
+                mctx.restore();
+
+                card.appendChild(miniCanvas);
+
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'skin-name';
+                nameDiv.textContent = suit.name;
+                card.appendChild(nameDiv);
+
+                if (isUnlocked) {
+                    card.onclick = () => {
+                        equippedSkinId = suit.id;
+                        saveSkinProgress();
+                        updateSkinDisplay();
+                        renderSkinGrid();
+                    };
+                }
+                skinGrid.appendChild(card);
+            });
+        }
+
+        function updateSkinDisplay() {
+            const currentSuit = SUITS_100[equippedSkinId] || SUITS_100[0];
+            if (skinDisplay) {
+                skinDisplay.textContent = currentSuit.name;
+                skinDisplay.style.color = currentSuit.primary;
+            }
+        }
+
+        function openSkinModal() {
+            startModal.style.display = 'none';
+            skinModal.style.display = 'flex';
+            renderSkinGrid();
+        }
+
+        function closeSkinModal() {
+            skinModal.style.display = 'none';
+            startModal.style.display = 'block';
+        }
+
+        // --- CONTROLS SYSTEM (KEYBOARD + TOUCH) ---
+        const keys = {};
+
+        function bindTouchBtn(elementId, keyName) {
+            const btn = document.getElementById(elementId);
+            if (!btn) return;
+            
+            const startHandler = (e) => {
+                e.preventDefault();
+                keys[keyName] = true;
+                initAudio();
+            };
+            const endHandler = (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+            };
+
+            btn.addEventListener('touchstart', startHandler, {passive: false});
+            btn.addEventListener('touchend', endHandler, {passive: false});
+            btn.addEventListener('mousedown', startHandler);
+            btn.addEventListener('mouseup', endHandler);
+        }
+
+        bindTouchBtn('btnUp', 'ArrowUp');
+        bindTouchBtn('btnDown', 'ArrowDown');
+        bindTouchBtn('btnSwing', 'w');
+
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            keys[e.key] = true;
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+            keys[e.key] = false;
+        });
+
+        // --- AUDIO SYSTEM ---
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (soundBanner) soundBanner.style.display = 'none';
+        }
+        window.addEventListener('touchstart', initAudio, {once: true});
+        window.addEventListener('click', initAudio, {once: true});
+
+        function playSound(freq, duration, type='sine') {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        // --- GAME PHYSICS & CONSTANTS ---
+        const GRAVITY = 0.38;
+        const CYCLE_DURATION = 180000;
+        const FINISH_LINE_X = 12000;
+
+        const DIFFICULTIES = {
+            'super-easy': { name: 'Super Easy', speedMult: 0.15, boostMult: 0.12 },
+            'easy':       { name: 'Easy',       speedMult: 0.42, boostMult: 0.36 },
+            'medium':     { name: 'Medium',     speedMult: 0.70, boostMult: 0.62 },
+            'hard':       { name: 'Hard',       speedMult: 0.98, boostMult: 0.90 }
+        };
+
+        const MAP_CONFIGS = {
+            'midtown': { name: 'Midtown', dayTop: [90, 170, 245], dayBot: [190, 225, 255], nightTop: [4, 8, 20], nightBot: [12, 20, 42], dayBuilding: [35, 45, 60], nightBuilding: [12, 16, 24], groundColor: '#080a0f', windowNight: 'rgba(255, 220, 120, 0.85)', obstacleType: 'drone' },
+            'park':    { name: 'Central Park', dayTop: [120, 210, 255], dayBot: [210, 245, 220], nightTop: [6, 18, 16], nightBot: [12, 35, 28], dayBuilding: [45, 65, 50], nightBuilding: [14, 25, 18], groundColor: '#19331e', windowNight: 'rgba(250, 240, 170, 0.8)', obstacleType: 'pigeon' },
+            'neon':    { name: 'Cyber 2099', dayTop: [25, 5, 40], dayBot: [85, 15, 95], nightTop: [10, 2, 25], nightBot: [45, 5, 65], dayBuilding: [22, 12, 38], nightBuilding: [12, 5, 22], groundColor: '#0e021a', windowNight: 'rgba(0, 240, 255, 0.9)', obstacleType: 'ufo' }
+        };
+
+        let currentDifficulty = 'easy';
+        let selectedMap = 'midtown';
+        let raceStartTime = 0;
+        let currentRaceTime = 0;
+
+        const player = { x: 300, y: 300, vx: 0, vy: 0, radius: 14, webAttached: false, anchor: null, ropeLength: 0, animTimer: 0, isGrounded: false, canJump: true, hitCooldown: 0, jumpCount: 0 };
+        const aiRival = { x: 200, y: 300, vx: 0, vy: 0, radius: 14, webAttached: false, anchor: null, ropeLength: 0, animTimer: 0, swingCooldown: 0, hitCooldown: 0 };
+        const camera = { x: 0, y: 0 };
+
+        const bgBuildings = [], buildings = [], obstacles = [];
+        let worldGenX = -500, bgWorldGenX = -500;
+
+        function generateBuildings() {
+            const viewportRight = Math.max(player.x, aiRival.x) + canvas.width + 1000;
+            while (worldGenX < viewportRight) {
+                const width = 160 + Math.random() * 200;
+                const height = 400 + Math.random() * 450;
+                const gap = 50 + Math.random() * 90;
+                buildings.push({ x: worldGenX, width, height });
+                if (Math.random() > 0.35 && worldGenX > 800 && worldGenX < FINISH_LINE_X - 500) {
+                    obstacles.push({ x: worldGenX + width + gap / 2, y: canvas.height - height + (Math.random() * 200 - 80), size: 32 });
+                }
+                worldGenX += width + gap;
+            }
+        }
+
+        let raceFinished = false;
+        let isCountingDown = false;
+        let countdownValue = 10;
+        let countdownTimerId = null;
+
+        function selectMap(key) {
+            selectedMap = key;
+            startStep1.style.display = 'none';
+            startStep2.style.display = 'block';
+        }
+
+        function goBackToStep1() {
+            startStep1.style.display = 'block';
+            startStep2.style.display = 'none';
+        }
+
+        function selectDifficulty(diff) {
+            currentDifficulty = diff;
+            startModal.style.display = 'none';
+            startCountdown();
+        }
+
+        function startCountdown() {
+            player.x = 300; player.y = 300; player.vx = 0; player.vy = 0; player.webAttached = false;
+            aiRival.x = 200; aiRival.y = 300; aiRival.vx = 0; aiRival.vy = 0; aiRival.webAttached = false;
+            raceFinished = false; isCountingDown = true; countdownValue = 3;
+            countdownOverlay.style.display = 'block';
+            countdownOverlay.textContent = countdownValue;
+
+            if (countdownTimerId) clearInterval(countdownTimerId);
+            countdownTimerId = setInterval(() => {
+                countdownValue--;
+                if (countdownValue > 0) {
+                    countdownOverlay.textContent = countdownValue;
+                    playSound(440, 0.1);
+                } else if (countdownValue === 0) {
+                    countdownOverlay.textContent = "GO!";
+                    playSound(880, 0.3);
+                } else {
+                    clearInterval(countdownTimerId);
+                    countdownOverlay.style.display = 'none';
+                    isCountingDown = false;
+                    raceStartTime = Date.now();
+                    player.vx = 7;
+                    aiRival.vx = 6 * DIFFICULTIES[currentDifficulty].speedMult;
+                }
+            }, 1000);
+        }
+
+        function openStartModal() {
+            raceModal.style.display = 'none';
+            startModal.style.display = 'block';
+            startStep1.style.display = 'block';
+            startStep2.style.display = 'none';
+        }
+
+        function update() {
+            if (raceFinished || isCountingDown) return;
+
+            currentRaceTime = (Date.now() - raceStartTime) / 1000;
+            if (timeDisplay) timeDisplay.textContent = currentRaceTime.toFixed(1) + 's';
+
+            // Player Controls
+            if (keys['ArrowUp'] && player.canJump && player.jumpCount < 2) {
+                player.vy = -10; player.vx += 2;
+                player.jumpCount++; player.canJump = false;
+                playSound(600, 0.1, 'triangle');
+            }
+            if (!keys['ArrowUp']) player.canJump = true;
+            if (keys['ArrowDown']) player.vy += 0.55;
+
+            // Swinging
+            if (keys['w']) {
+                if (!player.webAttached) {
+                    let best = null, maxScore = -Infinity;
+                    buildings.forEach(b => {
+                        const ax = b.x + b.width / 2, ay = canvas.height - b.height;
+                        const dist = Math.hypot(ax - player.x, ay - player.y);
+                        if (dist < 1000) {
+                            const score = (ax > player.x ? 400 : -200) - dist;
+                            if (score > maxScore) { maxScore = score; best = { x: ax, y: ay }; }
+                        }
+                    });
+                    if (best) {
+                        player.webAttached = true; player.anchor = best;
+                        player.ropeLength = Math.hypot(player.x - best.x, player.y - best.y);
+                        playSound(800, 0.08, 'sawtooth');
+                    }
+                } else {
+                    player.ropeLength = Math.max(40, player.ropeLength - 5);
+                    player.vy -= 0.4; player.vx += 0.1;
+                }
+            } else { player.webAttached = false; }
+
+            // Pendulum Physics
+            if (player.webAttached && player.anchor) {
+                player.vy += GRAVITY; player.x += player.vx; player.y += player.vy;
+                const dx = player.x - player.anchor.x, dy = player.y - player.anchor.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > player.ropeLength) {
+                    const angle = Math.atan2(dy, dx);
+                    player.x = player.anchor.x + Math.cos(angle) * player.ropeLength;
+                    player.y = player.anchor.y + Math.sin(angle) * player.ropeLength;
+                    const tangentX = -Math.sin(angle), tangentY = Math.cos(angle);
+                    const dot = player.vx * tangentX + player.vy * tangentY;
+                    player.vx = tangentX * dot; player.vy = tangentY * dot;
+                }
+            } else {
+                player.vy += GRAVITY; player.vx *= 0.995; player.x += player.vx; player.y += player.vy;
+            }
+
+            // AI Rival Physics
+            const diffData = DIFFICULTIES[currentDifficulty];
+            aiRival.vx += 0.05 * diffData.speedMult;
+            aiRival.x += aiRival.vx;
+
+            // Ground Collision
+            const groundY = canvas.height - 30;
+            if (player.y > groundY - player.radius) {
+                player.y = groundY - player.radius; player.vy = 0; player.jumpCount = 0;
+            }
+
+            // Camera Tracking
+            camera.x += (player.x - canvas.width * 0.35 - camera.x) * 0.1;
+            generateBuildings();
+
+            // Stats
+            speedDisplay.textContent = Math.round(Math.hypot(player.vx, player.vy) * 3);
+            distDisplay.textContent = Math.max(0, Math.round((FINISH_LINE_X - player.x) / 3));
+
+            if (player.x >= FINISH_LINE_X || aiRival.x >= FINISH_LINE_X) {
+                raceFinished = true;
+                raceModal.style.display = 'block';
+                if (player.x >= aiRival.x) {
+                    unlockNextSkin();
+                    winnerTitle.textContent = "YOU WIN! 🏆";
+                } else {
+                    winnerTitle.textContent = "RIVAL WINS! 🏃";
+                }
+            }
+        }
+
+        function drawCharacter(char, primaryColor, secondaryColor) {
+            ctx.save();
+            ctx.translate(char.x, char.y);
+            ctx.fillStyle = primaryColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, char.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = secondaryColor;
+            ctx.fillRect(-6, -4, 12, 8);
+            ctx.restore();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+
+            // Buildings
+            buildings.forEach(b => {
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(b.x, canvas.height - b.height, b.width, b.height);
+            });
+
+            // Web lines
+            if (player.webAttached && player.anchor) {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.anchor.x, player.anchor.y);
+                ctx.stroke();
+            }
+
+            // Finish Line
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(FINISH_LINE_X, 0, 10, canvas.height);
+
+            // Ground
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(camera.x - 100, canvas.height - 30, canvas.width + 200, 100);
+
+            // Players
+            const activeSuit = SUITS_100[equippedSkinId] || SUITS_100[0];
+            drawCharacter(player, activeSuit.primary, activeSuit.secondary);
+            drawCharacter(aiRival, '#ff3344', '#1e293b');
+
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        updateSkinDisplay();
+        gameLoop();
+    </script>
+</body>
+</html>
