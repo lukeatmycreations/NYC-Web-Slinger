@@ -2,7 +2,7 @@
 
 A fast-paced, physics-based 2D web-swinging game built with HTML5 Canvas and JavaScript. Race against an AI rival through dynamic cityscapes, unlock new suits, and master momentum-based swinging on desktop or mobile.
 
-🎮 **[Play the Live Demo](https://lukeatmycreations.github.io/nyc-web-slinger)**
+🎮 **[Play the Live Demo](https://lukeatmycreations.github.io/NYC-Web-Slinger)**
 
 ---
 
