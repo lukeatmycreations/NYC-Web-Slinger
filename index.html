@@ -22,7 +22,10 @@
             display: block;
             width: 100vw;
             height: 100vh;
+            background: #09111f;
         }
+        #gameCanvas { image-rendering: auto; }
+
         #ui {
             position: absolute;
             top: 15px;
@@ -442,7 +445,7 @@
                 <span class="map-icon">🏙️</span>
                 <div class="map-info">
                     <div class="map-title">Midtown Manhattan</div>
-                    <div class="map-desc">Dense skyscraper alleys with mid-air drones.</div>
+                    <div class="map-desc">Detailed skyscrapers, rooftop signs, windows, and drones.</div>
                 </div>
                 <span>➔</span>
             </button>
@@ -451,7 +454,7 @@
                 <span class="map-icon">🌳</span>
                 <div class="map-info">
                     <div class="map-title">Central Park & Playground</div>
-                    <div class="map-desc">Trees, grass, playgrounds, and pigeons.</div>
+                    <div class="map-desc">Park trees, city towers, open space, and pigeons.</div>
                 </div>
                 <span>➔</span>
             </button>
@@ -460,7 +463,7 @@
                 <span class="map-icon">🌃</span>
                 <div class="map-info">
                     <div class="map-title">Cyber-NYC 2099</div>
-                    <div class="map-desc">Futuristic synthwave skyline with neon hover discs.</div>
+                    <div class="map-desc">Neon towers, glowing signs, and futuristic hover discs.</div>
                 </div>
                 <span>➔</span>
             </button>
@@ -743,12 +746,23 @@
         function generateBuildings() {
             const viewportRight = Math.max(player.x, aiRival.x) + canvas.width + 1000;
             while (worldGenX < viewportRight) {
-                const width = 160 + Math.random() * 200;
-                const height = 400 + Math.random() * 450;
-                const gap = 50 + Math.random() * 90;
-                buildings.push({ x: worldGenX, width, height });
-                if (Math.random() > 0.35 && worldGenX > 800 && worldGenX < FINISH_LINE_X - 500) {
-                    obstacles.push({ x: worldGenX + width + gap / 2, y: canvas.height - height + (Math.random() * 200 - 80), size: 32 });
+                const width = 130 + Math.random() * 190;
+                const height = 260 + Math.random() * 420;
+                const gap = 35 + Math.random() * 75;
+                const hue = Math.floor(Math.random() * 18);
+                const style = Math.floor(Math.random() * 4);
+                buildings.push({
+                    x: worldGenX,
+                    width, height, style, hue,
+                    rooftop: Math.random() > 0.72,
+                    sign: Math.random() > 0.62
+                });
+                if (Math.random() > 0.42 && worldGenX > 800 && worldGenX < FINISH_LINE_X - 500) {
+                    obstacles.push({
+                        x: worldGenX + width + gap / 2,
+                        y: canvas.height - height + (Math.random() * 200 - 80),
+                        size: 32
+                    });
                 }
                 worldGenX += width + gap;
             }
@@ -780,6 +794,10 @@
             player.x = 300; player.y = 300; player.vx = 0; player.vy = 0; player.webAttached = false;
             aiRival.x = 200; aiRival.y = 300; aiRival.vx = 0; aiRival.vy = 0; aiRival.webAttached = false;
             raceFinished = false; isCountingDown = true; countdownValue = 3;
+            buildings.length = 0; obstacles.length = 0; worldGenX = -500;
+            bgBuildings.length = 0; bgWorldGenX = -500;
+            player.jumpCount = 0; player.canJump = true; player.hitCooldown = 0;
+            aiRival.hitCooldown = 0;
             countdownOverlay.style.display = 'block';
             countdownOverlay.textContent = countdownValue;
 
@@ -876,6 +894,19 @@
                 player.y = groundY - player.radius; player.vy = 0; player.jumpCount = 0;
             }
 
+            // Mid-air obstacle collisions. A hit costs momentum but keeps the race moving.
+            if (player.hitCooldown > 0) player.hitCooldown--;
+            obstacles.forEach(o => {
+                const ox = o.x, oy = o.y;
+                const d = Math.hypot(player.x - ox, player.y - oy);
+                if (d < player.radius + o.size * 0.48 && player.hitCooldown === 0) {
+                    player.vx *= 0.55;
+                    player.vy += 2.5;
+                    player.hitCooldown = 45;
+                    playSound(120, 0.12, 'square');
+                }
+            });
+
             // Camera Tracking
             camera.x += (player.x - canvas.width * 0.35 - camera.x) * 0.1;
             generateBuildings();
@@ -896,55 +927,213 @@
             }
         }
 
-        function drawCharacter(char, primaryColor, secondaryColor) {
+        function lerp(a,b,t){ return a + (b-a)*t; }
+
+        function roundedRect(c,x,y,w,h,r){
+            c.beginPath();
+            c.moveTo(x+r,y);
+            c.arcTo(x+w,y,x+w,y+h,r);
+            c.arcTo(x+w,y+h,x,y+h,r);
+            c.arcTo(x,y+h,x,y,r);
+            c.arcTo(x,y,x+w,y,r);
+            c.closePath();
+        }
+
+        function drawSkylineLayer(parallax, baseY, alpha, minH, maxH, step){
+            const start = Math.floor(camera.x * parallax / step) * step - step*2;
             ctx.save();
-            ctx.translate(char.x, char.y);
-            ctx.fillStyle = primaryColor;
-            ctx.beginPath();
-            ctx.arc(0, 0, char.radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = secondaryColor;
-            ctx.fillRect(-6, -4, 12, 8);
+            ctx.globalAlpha = alpha;
+            for(let x=start; x<camera.x+canvas.width/Math.max(parallax,0.01)+step*2; x+=step){
+                const seed = Math.abs(Math.floor(x/step));
+                const h = minH + ((seed*47)%Math.max(1,maxH-minH));
+                ctx.fillStyle = `hsl(${215 + (seed%12)}, ${18 + seed%12}%, ${13 + seed%10}%)`;
+                ctx.fillRect(x, baseY-h, step-8, h);
+                if(parallax > .45){
+                    ctx.fillStyle = 'rgba(255,220,120,.28)';
+                    for(let wy=baseY-h+18; wy<baseY-20; wy+=26){
+                        for(let wx=x+10; wx<x+step-18; wx+=18){
+                            if(((wx/18 + wy/26 + seed)%4)<1.4) ctx.fillRect(wx,wy,6,9);
+                        }
+                    }
+                }
+            }
             ctx.restore();
         }
 
-        function draw() {
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawBuilding(b, cfg, groundY, isNight){
+            const top = groundY - b.height;
+            const palettes = [
+                [38,48,67], [52,56,70], [31,58,72], [60,48,66]
+            ];
+            const p = palettes[b.style];
+            const light = isNight ? 15 : p[2];
+            ctx.fillStyle = `hsl(${210+b.hue}, ${18+b.style*5}%, ${light}%)`;
+            ctx.fillRect(b.x, top, b.width, b.height);
 
-            ctx.save();
-            ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+            // Building edge and rooftop details
+            ctx.fillStyle = isNight ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.08)';
+            ctx.fillRect(b.x, top, Math.min(9,b.width*.06), b.height);
+            ctx.fillStyle = isNight ? 'rgba(255,210,100,.82)' : 'rgba(180,225,255,.30)';
+            const cols = Math.max(2, Math.floor(b.width/34));
+            const rows = Math.max(3, Math.floor(b.height/38));
+            const padX = 12, padY = 18;
+            const ww = Math.max(6,(b.width-padX*2)/cols-7);
+            const wh = 10;
+            for(let r=0;r<rows;r++){
+                for(let c=0;c<cols;c++){
+                    const lit = ((r*7+c*11+b.style*5+Math.floor(b.x/10))%7) < (isNight?4:1);
+                    if(lit){
+                        const wx=b.x+padX+c*((b.width-padX*2)/cols);
+                        const wy=top+padY+r*38;
+                        if(wy+wh<groundY-12) ctx.fillRect(wx,wy,ww,wh);
+                    }
+                }
+            }
+            if(b.rooftop){
+                ctx.fillStyle = '#202a3a';
+                ctx.fillRect(b.x+b.width*.18,top-18,b.width*.64,18);
+                ctx.fillStyle = '#718096';
+                ctx.fillRect(b.x+b.width*.48,top-36,8,18);
+                ctx.beginPath(); ctx.arc(b.x+b.width*.52,top-40,4,0,Math.PI*2); ctx.fill();
+            }
+            if(b.sign){
+                ctx.fillStyle = isNight ? 'rgba(255,50,100,.85)' : 'rgba(45,170,255,.65)';
+                roundedRect(ctx,b.x+b.width*.18,top+b.height*.28,Math.min(70,b.width*.64),22,5); ctx.fill();
+                ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+                ctx.fillText(cfg.name==='Cyber 2099'?'NOVA':'NYC',b.x+b.width*.5,top+b.height*.28+15);
+            }
+        }
 
-            // Buildings
-            buildings.forEach(b => {
-                ctx.fillStyle = '#1e293b';
-                ctx.fillRect(b.x, canvas.height - b.height, b.width, b.height);
+        function drawTree(x, y, scale, night){
+            ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale);
+            ctx.fillStyle='#4b3426'; ctx.fillRect(-5,-45,10,45);
+            ctx.fillStyle=night?'#123d2b':'#1d6b3a';
+            [[-18,-42,18], [5,-58,22], [0,-82,20], [-20,-70,16]].forEach(v=>{
+                ctx.beginPath(); ctx.arc(v[0],v[1],v[2],0,Math.PI*2); ctx.fill();
             });
+            ctx.restore();
+        }
 
-            // Web lines
-            if (player.webAttached && player.anchor) {
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(player.x, player.y);
-                ctx.lineTo(player.anchor.x, player.anchor.y);
-                ctx.stroke();
+        function drawObstacle(o, cfg, isNight){
+            const pulse=1+Math.sin(Date.now()/150)*.08;
+            ctx.save(); ctx.translate(o.x,o.y); ctx.scale(pulse,pulse);
+            const type=cfg.obstacleType;
+            if(type==='drone'){
+                ctx.fillStyle='#374151'; ctx.fillRect(-17,-9,34,18);
+                ctx.fillStyle='#ef4444'; ctx.fillRect(-6,-3,12,6);
+                ctx.strokeStyle='#93c5fd'; ctx.lineWidth=3;
+                ctx.beginPath(); ctx.moveTo(-28,-15);ctx.lineTo(-10,-15);ctx.moveTo(10,-15);ctx.lineTo(28,-15);ctx.stroke();
+            } else if(type==='pigeon'){
+                ctx.fillStyle='#94a3b8'; ctx.beginPath(); ctx.ellipse(0,0,18,11,0,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle='#64748b';ctx.beginPath();ctx.arc(15,-5,7,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.moveTo(21,-5);ctx.lineTo(28,-2);ctx.lineTo(21,0);ctx.fill();
+            } else {
+                ctx.strokeStyle='#22d3ee';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(0,0,24,9,0,0,Math.PI*2);ctx.stroke();
+                ctx.fillStyle='rgba(168,85,247,.55)';ctx.beginPath();ctx.ellipse(0,0,12,5,0,0,Math.PI*2);ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function drawCharacter(char, primaryColor, secondaryColor, isPlayer){
+            ctx.save();
+            ctx.translate(char.x,char.y);
+            if(char.hitCooldown>0 && Math.floor(char.hitCooldown/4)%2===0) ctx.globalAlpha=.45;
+            const facing=char.vx>=0?1:-1;
+            ctx.scale(facing,1);
+            // shadow
+            ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(0,24,20,5,0,0,Math.PI*2);ctx.fill();
+            // legs
+            ctx.strokeStyle=secondaryColor;ctx.lineWidth=7;ctx.lineCap='round';
+            ctx.beginPath();ctx.moveTo(-6,12);ctx.lineTo(-10,27);ctx.moveTo(6,12);ctx.lineTo(11,27);ctx.stroke();
+            // torso
+            ctx.fillStyle=primaryColor;roundedRect(ctx,-13,-10,26,28,8);ctx.fill();
+            // chest stripe
+            ctx.fillStyle=secondaryColor;ctx.fillRect(-13,-1,26,6);
+            // arms
+            ctx.strokeStyle=primaryColor;ctx.lineWidth=6;
+            const armLift=char.webAttached?-14:0;
+            ctx.beginPath();ctx.moveTo(-11,-3);ctx.lineTo(-20,armLift);ctx.moveTo(11,-3);ctx.lineTo(20,armLift-3);ctx.stroke();
+            // head + helmet
+            ctx.fillStyle='#f3c7a5';ctx.beginPath();ctx.arc(0,-19,10,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle=primaryColor;ctx.beginPath();ctx.arc(0,-21,11,Math.PI,Math.PI*2);ctx.fill();
+            ctx.fillStyle='rgba(120,220,255,.9)';roundedRect(ctx,-7,-21,14,5,2);ctx.fill();
+            // logo
+            ctx.fillStyle=secondaryColor;ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText(isPlayer?'R':'A',0,10);
+            ctx.restore();
+        }
+
+        function draw(){
+            const cfg=MAP_CONFIGS[selectedMap];
+            const cycle=(Date.now()%CYCLE_DURATION)/CYCLE_DURATION;
+            const night=Math.sin(cycle*Math.PI*2)>0.35;
+            const t=night?1:0;
+            const top=cfg.dayTop.map((v,i)=>Math.round(lerp(v,cfg.nightTop[i],t)));
+            const bot=cfg.dayBot.map((v,i)=>Math.round(lerp(v,cfg.nightBot[i],t)));
+            const grad=ctx.createLinearGradient(0,0,0,canvas.height);
+            grad.addColorStop(0,`rgb(${top.join(',')})`);
+            grad.addColorStop(.65,`rgb(${bot.join(',')})`);
+            grad.addColorStop(1,cfg.groundColor);
+            ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
+
+            // Sun/moon and atmospheric glow
+            ctx.save();
+            const celestialX=canvas.width*.78, celestialY=canvas.height*.20;
+            ctx.globalAlpha=.8;
+            ctx.fillStyle=night?'#e2e8f0':'#fff4b8';ctx.beginPath();ctx.arc(celestialX,celestialY,night?28:42,0,Math.PI*2);ctx.fill();
+            ctx.globalAlpha=.15;ctx.fillStyle=night?'#b8c8ff':'#fff';ctx.beginPath();ctx.arc(celestialX,celestialY,night?58:78,0,Math.PI*2);ctx.fill();
+            ctx.restore();
+
+            const groundY=canvas.height-30;
+            ctx.save();ctx.translate(-Math.round(camera.x),0);
+
+            drawSkylineLayer(.12,groundY-120,.45,180,300,170);
+            drawSkylineLayer(.25,groundY-70,.65,220,400,155);
+
+            buildings.forEach(b=>drawBuilding(b,cfg,groundY,night));
+
+            // Street, rails and lane markings
+            ctx.fillStyle=cfg.groundColor;ctx.fillRect(camera.x-200,groundY,canvas.width+500,100);
+            ctx.fillStyle=night?'#151c29':'#202b36';ctx.fillRect(camera.x-200,groundY,canvas.width+500,8);
+            ctx.fillStyle='rgba(255,255,255,.22)';
+            for(let x=Math.floor((camera.x-200)/120)*120;x<camera.x+canvas.width+200;x+=120) ctx.fillRect(x,groundY+45,65,4);
+
+            // Parks
+            if(selectedMap==='park'){
+                for(let x=Math.floor((camera.x-100)/180)*180;x<camera.x+canvas.width+200;x+=180) drawTree(x+45,groundY+2,0.8+(x%60)/150,night);
             }
 
-            // Finish Line
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(FINISH_LINE_X, 0, 10, canvas.height);
+            obstacles.forEach(o=>drawObstacle(o,cfg,night));
 
-            // Ground
-            ctx.fillStyle = '#020617';
-            ctx.fillRect(camera.x - 100, canvas.height - 30, canvas.width + 200, 100);
+            // Finish banner
+            ctx.fillStyle='#fff';ctx.fillRect(FINISH_LINE_X,0,12,groundY);
+            for(let y=0;y<groundY;y+=24){ctx.fillStyle=(y/24%2===0)?'#111827':'#ef4444';ctx.fillRect(FINISH_LINE_X,y,12,24);}
+            ctx.fillStyle='#fff';ctx.font='900 18px sans-serif';ctx.textAlign='center';ctx.fillText('FINISH',FINISH_LINE_X+6,80);
 
-            // Players
-            const activeSuit = SUITS_100[equippedSkinId] || SUITS_100[0];
-            drawCharacter(player, activeSuit.primary, activeSuit.secondary);
-            drawCharacter(aiRival, '#ff3344', '#1e293b');
+            // Web
+            if(player.webAttached && player.anchor){
+                ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=5;
+                ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(player.anchor.x,player.anchor.y);ctx.stroke();
+                ctx.strokeStyle='#fff';ctx.lineWidth=2;
+                ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(player.anchor.x,player.anchor.y);ctx.stroke();
+                ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(player.anchor.x,player.anchor.y,5,0,Math.PI*2);ctx.fill();
+            }
+
+            drawCharacter(aiRival,'#ef4444','#111827',false);
+            const activeSuit=SUITS_100[equippedSkinId]||SUITS_100[0];
+            drawCharacter(player,activeSuit.primary,activeSuit.secondary,true);
+
+            // Nameplates make both racers immediately visible.
+            ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+            ctx.fillStyle='#fff';ctx.fillText('RIVAL',aiRival.x,aiRival.y-38);
+            ctx.fillStyle=activeSuit.primary;ctx.fillText('YOU',player.x,player.y-42);
 
             ctx.restore();
+
+            // Vignette for cinematic depth
+            const vignette=ctx.createRadialGradient(canvas.width/2,canvas.height/2,Math.min(canvas.width,canvas.height)*.2,canvas.width/2,canvas.height/2,Math.max(canvas.width,canvas.height)*.75);
+            vignette.addColorStop(0,'rgba(0,0,0,0)');
+            vignette.addColorStop(1,'rgba(0,0,0,.34)');
+            ctx.fillStyle=vignette;ctx.fillRect(0,0,canvas.width,canvas.height);
         }
 
         function gameLoop() {
